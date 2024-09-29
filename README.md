@@ -82,9 +82,6 @@ Follow these instructions to get a copy of the project up and running on your lo
 - **Login**: Sign in with your credentials.
 - **Start Chatting**: Connect with other users, start video calls, or send instant messages.
 
-## Screenshots
-![Screenshot 2024-09-28 212300](https://github.com/user-attachments/assets/e845d06a-ce93-47e8-be77-c138f9745532)
-
 
 ## Contributing
 
