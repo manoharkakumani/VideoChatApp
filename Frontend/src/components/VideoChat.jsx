@@ -26,6 +26,8 @@ const VideoChat = ({ friend, onBack }) => {
   const peerConnectionRef = useRef(null);
   const auth = useSelector((state) => state.auth);
   const { ws, sendMessages } = useContext(WebSocketContext);
+  const messageQueueRef = useRef([]);
+  const isSendingRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,8 +99,32 @@ const VideoChat = ({ friend, onBack }) => {
           language: auth.user.language,
         },
       };
-      sendMessages(messageData);
+      enqueueMessage(messageData);
       setNewMessage("");
+    }
+  };
+
+  const enqueueMessage = (message) => {
+    messageQueueRef.current.push(message);
+    if (!isSendingRef.current) {
+      sendNextMessage();
+    }
+  };
+
+  const sendNextMessage = () => {
+    if (messageQueueRef.current.length > 0) {
+      isSendingRef.current = true;
+      const message = messageQueueRef.current.shift();
+      sendMessages(message, (success) => {
+        if (success) {
+          sendNextMessage();
+        } else {
+          messageQueueRef.current.unshift(message);
+          isSendingRef.current = false;
+        }
+      });
+    } else {
+      isSendingRef.current = false;
     }
   };
 

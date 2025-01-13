@@ -1,5 +1,3 @@
-// websocketServer.js
-
 import User from "./models/user.js";
 import Chat from "./models/chat.js";
 import Message from "./models/message.js";
@@ -7,6 +5,8 @@ import Message from "./models/message.js";
 import { WebSocketServer, WebSocket } from "ws";
 
 const clients = {};
+const heartbeatInterval = 30000; // 30 seconds
+const heartbeatTimeout = 10000; // 10 seconds
 
 const handleSignalingData = (message) => {
   console.log("Handling signaling data:", message);
@@ -149,6 +149,31 @@ const initializeWebSocketServer = (server) => {
       console.log(`Connection closed for ${userId}`);
       updateUsersOnlineStatus(userId, false);
       delete clients[userId];
+    });
+
+    ws.on("error", (error) => {
+      console.error(`WebSocket error for ${userId}:`, error);
+    });
+
+    ws.isAlive = true;
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
+
+    const interval = setInterval(() => {
+      wss.clients.forEach((client) => {
+        if (client.isAlive === false) {
+          console.log(`Terminating connection for ${userId}`);
+          return client.terminate();
+        }
+
+        client.isAlive = false;
+        client.ping();
+      });
+    }, heartbeatInterval);
+
+    ws.on("close", () => {
+      clearInterval(interval);
     });
   });
 

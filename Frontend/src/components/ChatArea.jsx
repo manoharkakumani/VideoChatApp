@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import { WebSocketContext } from "../context/WebSocketProvider";
 import { getChatById } from "../api/api";
@@ -8,6 +8,8 @@ const ChatArea = ({ friend, onBack, onVideoCall }) => {
   const [newMessage, setNewMessage] = useState("");
   const auth = useSelector((state) => state.auth);
   const { ws, sendMessages } = useContext(WebSocketContext);
+  const messageQueueRef = useRef([]);
+  const isSendingRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -57,8 +59,32 @@ const ChatArea = ({ friend, onBack, onVideoCall }) => {
           language: auth.user.language,
         },
       };
-      sendMessages(messageData);
+      enqueueMessage(messageData);
       setNewMessage("");
+    }
+  };
+
+  const enqueueMessage = (message) => {
+    messageQueueRef.current.push(message);
+    if (!isSendingRef.current) {
+      sendNextMessage();
+    }
+  };
+
+  const sendNextMessage = () => {
+    if (messageQueueRef.current.length > 0) {
+      isSendingRef.current = true;
+      const message = messageQueueRef.current.shift();
+      sendMessages(message, (success) => {
+        if (success) {
+          sendNextMessage();
+        } else {
+          messageQueueRef.current.unshift(message);
+          isSendingRef.current = false;
+        }
+      });
+    } else {
+      isSendingRef.current = false;
     }
   };
 

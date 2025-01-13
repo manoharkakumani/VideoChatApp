@@ -13,6 +13,8 @@ export const WebSocketProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
   const [videoCallMessage, setVideoCallMessage] = useState(null);
   const [signalMessage, setSignalMessage] = useState(null);
+  const heartbeatIntervalRef = useRef(null);
+  const maxReconnectAttempts = 5;
 
   useEffect(() => {
     const connectWebSocket = () => {
@@ -22,6 +24,7 @@ export const WebSocketProvider = ({ children }) => {
         wsRef.current.onopen = () => {
           console.log("WebSocket connection opened");
           reconnectAttemptsRef.current = 0; // Reset reconnect attempts
+          startHeartbeat();
         };
 
         wsRef.current.onmessage = (e) => {
@@ -36,15 +39,20 @@ export const WebSocketProvider = ({ children }) => {
         wsRef.current.onclose = () => {
           console.log("WebSocket connection closed, retrying...");
           wsRef.current = null;
+          stopHeartbeat();
           handleReconnect();
         };
       }
     };
 
     const handleReconnect = () => {
-      const timeout = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 30000); // Exponential backoff
-      reconnectAttemptsRef.current += 1;
-      timeoutRef.current = setTimeout(connectWebSocket, timeout);
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        const timeout = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 30000); // Exponential backoff
+        reconnectAttemptsRef.current += 1;
+        timeoutRef.current = setTimeout(connectWebSocket, timeout);
+      } else {
+        console.log("Maximum reconnect attempts reached. Giving up.");
+      }
     };
 
     const handleMessage = (message) => {
@@ -63,6 +71,20 @@ export const WebSocketProvider = ({ children }) => {
       }
     };
 
+    const startHeartbeat = () => {
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30000); // Send a ping every 30 seconds
+    };
+
+    const stopHeartbeat = () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+    };
+
     if (user) {
       connectWebSocket();
     }
@@ -74,6 +96,7 @@ export const WebSocketProvider = ({ children }) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      stopHeartbeat();
     };
   }, [user]);
 
